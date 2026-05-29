@@ -60,10 +60,10 @@ class MoedaEspecial(arcade.Sprite):
         self.center_y += self.change_y
 
         # Rebote no Eixo X
-        if self.left < 0 or self.right > 800:
+        if self.left <= 0 or self.right >= 800:
             self.change_x *= -1  
         # Rebote no Eixo Y
-        if self.bottom < 0 or self.top > 600:
+        if self.bottom <= 0 or self.top >= 600:
             self.change_y *= -1
 
 
