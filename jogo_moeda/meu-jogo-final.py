@@ -71,13 +71,47 @@ class Player(arcade.Sprite):
             self.bottom = 0
         
 
+# Criação da tela inicial, agora com várias Views
+class TelaInicial(arcade.View):
+    def __init__(self):
+        super().__init__()
+        # Definir a cor de fundo da janela
+        arcade.set_background_color( arcade.color.AMAZON )
+        # Carrega uma textura
+        # self.fundo = arcade.load_texture("imagem.png")
+        
+    def on_draw(self):
+        self.clear()
+        # Desenha a textura de fundo nessa tela
+        # arcade.draw_texture_rect(
+        #     texture=self.fundo,
+        #     rect=arcade.XYWH(
+        #         x=LARGURA / 2,
+        #         y=ALTURA / 2,
+        #         width=LARGURA,
+        #         height=ALTURA
+        #     )
+        # )
+        # Desenha textos simples centralizados na tela
+        arcade.draw_text("COLETOR DE MOEDAS", LARGURA / 2, 400, arcade.color.WHITE, 32, anchor_x="center")
+        arcade.draw_text("Pressione [J] para Jogar", LARGURA / 2, 300, arcade.color.WHITE, 18, anchor_x="center")
+        arcade.draw_text("Pressione [ESC] para Sair", LARGURA / 2, 240, arcade.color.WHITE, 18, anchor_x="center")
+
+    def on_key_press(self, key, modifiers):
+        if key == arcade.key.J or key == arcade.key.ENTER:
+            tela_jogo = TelaJogo() # Instancia a tela do jogo
+            self.window.show_view(tela_jogo) # Encaixa ela na janela ativa
+        elif key == arcade.key.ESCAPE:
+            arcade.close_window()
+
+
 # Criação da classe da janela do jogo, que herda da classe Window do Arcade
-class JanelaJogo(arcade.Window):
+class TelaJogo(arcade.View):
     
     def __init__(self):
         
         # Chamar o construtor da classe pai (arcade.Window) para criar a janela do jogo com as dimensões e título definidos
-        super().__init__(LARGURA, ALTURA, TITULO)
+        super().__init__()
         # Definir a cor de fundo da janela
         arcade.set_background_color( arcade.color.AMAZON )
         # Carregar a imagem de fundo
@@ -188,6 +222,11 @@ class JanelaJogo(arcade.Window):
             else:
                 self.pontuacao += 1
 
+        # Verificar se ainda tem moedas na sprite list
+        if( len(self.sprite_moedas) == 0 ):
+            # Fechar o jogo
+            arcade.close_window()
+
     # Eventos de teclas pressionadas
     def on_key_press(self, key, modifiers):
 
@@ -201,9 +240,10 @@ class JanelaJogo(arcade.Window):
         elif(key == arcade.key.DOWN):
             self.personagem.change_y -= self.velocidade
 
-        # Se apertou ESC, sai do jogo
+        # Se apertou ESC, sai do jogo para a tela inicial
         if(key == arcade.key.ESCAPE):
-            arcade.close_window()
+            tela_inicial = TelaInicial()
+            self.window.show_view(tela_inicial)
 
     # Evento ao soltar as teclas
     def on_key_release(self, key, modifiers):
@@ -213,7 +253,13 @@ class JanelaJogo(arcade.Window):
             self.personagem.change_y = 0
 
 def executar():
-    jogo = JanelaJogo()
+    # Cria a janela principal do jogo com os parâmetros
+    jogo = arcade.Window(LARGURA, ALTURA, TITULO)
+    # Cria uma tela inicial
+    tela_inicial = TelaInicial()
+    # Coloca essa tela inicial na janela do jogo
+    jogo.show_view(tela_inicial)
+    # Executa o arcade
     arcade.run()
 
 if __name__ == "__main__":
