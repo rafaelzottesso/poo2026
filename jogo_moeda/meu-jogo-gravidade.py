@@ -12,6 +12,22 @@ TITULO = "Meu jogo!"  # Título exibido na barra superior da janela
 
 
 # ==========================================
+# CLASSE BLOCO (PLATAFORMAS / CHÃO)
+# ==========================================
+class Bloco(arcade.Sprite):
+    """
+    Classe que representa um bloco sólido (chão ou plataforma suspensa).
+    Herda da classe arcade.Sprite.
+    """
+    def __init__(self, x: float, y: float):
+        # Chama o construtor da classe pai (arcade.Sprite) carregando a imagem do bloco com escala 1.0
+        super().__init__("bloco.png", scale=1)
+        # Define a posição inicial (coordenadas X e Y centrais) do bloco no momento da instanciação
+        self.center_x = x
+        self.center_y = y
+
+
+# ==========================================
 # CLASSE MOEDA (ITENS COLETÁVEIS)
 # ==========================================
 class Moeda(arcade.Sprite):
@@ -46,7 +62,7 @@ class Moeda(arcade.Sprite):
 class Player(arcade.Sprite):
     """
     Classe que representa o personagem controlado pelo jogador.
-    Herda da classe arcade.Sprite e gerencia a movimentação e alternância de texturas.
+    Herda da classe arcade.Sprite e gerencia a alternância de texturas ao mudar de direção.
     """
     # O método __init__ é o construtor da classe, onde definimos as características iniciais do objeto
     def __init__(self):
@@ -56,37 +72,23 @@ class Player(arcade.Sprite):
         self.textura_direita = arcade.load_texture("direita.png")
         self.textura_esquerda = arcade.load_texture("esquerda.png")
     
-    # O método update é chamado a cada frame do jogo para mover e atualizar a textura do personagem
-    def update(self, delta_time: float = 1/60):
-        # Adicionar a movimentação no eixo x e y
-        self.center_x += self.change_x
-        self.center_y += self.change_y
-        
+    # O método update atualiza a aparência do personagem e garante que ele permaneça dentro da tela
+    def update(self):
         # Verificar a direção do movimento horizontal para mudar a textura do personagem
-        # Se estiver se movendo para a direita, usa a textura virada para a direita
+        # Se a velocidade horizontal for positiva, o personagem está indo para a direita
         if self.change_x > 0:
             self.texture = self.textura_direita
-        # Se estiver se movendo para a esquerda, usa a textura virada para a esquerda
+        # Se a velocidade horizontal for negativa, o personagem está indo para a esquerda
         elif self.change_x < 0:
             self.texture = self.textura_esquerda
 
-        # Manter o Player dentro dos limites da janela
-        # Limita ele na borda da direita
+        # Manter o Player dentro dos limites visíveis da janela
+        # Limita o jogador na borda direita
         if self.right > LARGURA:
-            self.change_x = 0
             self.right = LARGURA
-        # Limita ele na borda da esquerda
+        # Limita o jogador na borda esquerda
         if self.left < 0:
-            self.change_x = 0
             self.left = 0
-        # Limita ele na borda de cima
-        if self.top > ALTURA:
-            self.change_y = 0
-            self.top = ALTURA
-        # Limita ele na borda inferior
-        if self.bottom < 0:
-            self.change_y = 0
-            self.bottom = 0
 
 
 # ==========================================
@@ -102,7 +104,7 @@ class TelaInicial(arcade.View):
         super().__init__()
         
     def on_show_view(self):
-        # Definir a cor de fundo da janela ao exibir esta tela
+        # Define a cor de fundo da janela ao exibir esta view
         arcade.set_background_color(arcade.color.AMAZON)
         
     def on_draw(self):
@@ -116,8 +118,8 @@ class TelaInicial(arcade.View):
     def on_key_press(self, key, modifiers):
         # Se o usuário pressionar 'J' ou 'ENTER', instancia a tela do jogo e a exibe na janela
         if key == arcade.key.J or key == arcade.key.ENTER:
-            tela_jogo = TelaJogo()            # Instancia a tela do jogo
-            self.window.show_view(tela_jogo)  # Encaixa ela na janela ativa
+            tela_jogo = TelaJogo()            # Instancia a tela da partida
+            self.window.show_view(tela_jogo)  # Troca a view ativa para a tela do jogo
         # Se pressionar 'ESC', encerra a aplicação
         elif key == arcade.key.ESCAPE:
             arcade.close_window()
@@ -128,7 +130,7 @@ class TelaInicial(arcade.View):
 # ==========================================
 class TelaJogo(arcade.View):
     """
-    Classe que gerencia toda a lógica e renderização da partida.
+    Classe que gerencia toda a lógica, renderização e física da partida.
     Herda de arcade.View.
     """
     def __init__(self):
@@ -138,59 +140,76 @@ class TelaJogo(arcade.View):
         # Carregar a imagem de fundo do cenário do jogo
         self.fundo = arcade.load_texture("cenario.png")
         
-        # Define a velocidade base de deslocamento do jogador
+        # Define a velocidade de movimento horizontal do jogador
         self.velocidade = 3
         # Armazena a pontuação acumulada pelo jogador
         self.pontuacao = 0
         
         # Armazena o tempo decorrido do jogo em segundos
         self.tempo_decorrido = 0.0
-        # Armazena o timestamp de início da partida para cálculo do tempo total
+        # Armazena o timestamp do início da partida
         self.tempo_inicio = time.time()
 
         # Cria as listas de sprites que agrupam os elementos na tela
         self.sprite_moedas = arcade.SpriteList()   # Lista para armazenar todas as moedas
         self.sprite_jogador = arcade.SpriteList()  # Lista para armazenar o jogador
+        self.sprite_blocos = arcade.SpriteList()   # Lista para armazenar os blocos do chão e plataformas
 
-        # Criar o personagem do jogador
+        # Instancia o objeto do personagem/jogador
         self.personagem = Player()
-        # Posicionar o jogador no canto inferior esquerdo
+        # Posiciona o jogador no canto inferior esquerdo inicialmente
         self.personagem.left = 0
-        self.personagem.bottom = 0
-        # Adicionar o personagem na spriteList de jogador
+        self.personagem.bottom = 50
+        # Adiciona o personagem na lista de sprites do jogador
         self.sprite_jogador.append(self.personagem)
 
-        # Criar uma moeda inicial em movimento
+        # Cria uma moeda inicial móvel
         self.moeda = Moeda()
-        # Posicionar a moeda na tela
         self.moeda.center_x = 100
-        self.moeda.center_y = 50
-        # Adiciona movimento na moeda
+        self.moeda.center_y = 150
+        # Define velocidade para que esta moeda fique se movendo e rebatendo
         self.moeda.change_x = self.velocidade
         self.moeda.change_y = self.velocidade
-        # Adicionar a moeda ao grupo de sprites de moedas
+        # Adiciona a moeda na lista de moedas
         self.sprite_moedas.append(self.moeda)
 
-        # Cria um laço de repetição para criar 25 moedas adicionais
-        for _ in range(25):
-            # Criar um objeto moeda
+        # Laço de repetição para gerar 25 moedas adicionais em posições aleatórias
+        for x in range(25):
             moeda_simples = Moeda()
-            # Posiciona em coordenadas X e Y aleatórias dentro dos limites
+            # Posiciona a moeda em coordenadas X e Y aleatórias dentro dos limites da tela
             moeda_simples.center_x = random.randint(50, LARGURA - 50)
-            moeda_simples.center_y = random.randint(50, ALTURA - 50)
+            moeda_simples.center_y = random.randint(80, ALTURA - 50)
             # Adiciona a moeda gerada na lista de moedas
             self.sprite_moedas.append(moeda_simples)
 
+        # Criação do chão sólido: blocos lado a lado na base da tela (largura de 64px cada)
+        for x in range(32, LARGURA + 32, 64):
+            chao = Bloco(x=x, y=10)
+            self.sprite_blocos.append(chao)
+
+        # Criação de plataformas suspensas com blocos em coordenadas predefinidas
+        posicoes_plataforma = [(300, 250), (550, 250)]
+        for x, y in posicoes_plataforma:
+            plataforma = Bloco(x, y)
+            self.sprite_blocos.append(plataforma)
+
+        # Cria a engine de física com gravidade e detecção de colisão com os blocos
+        self.engine_fisica = arcade.PhysicsEnginePlatformer(
+            player_sprite=self.personagem,
+            walls=self.sprite_blocos,
+            gravity_constant=0.5
+        )
+
     def on_show_view(self):
-        # Definir a cor de fundo da janela ao exibir a tela do jogo
+        # Define a cor de fundo da janela ao exibir a tela do jogo
         arcade.set_background_color(arcade.color.AMAZON)
-    
+
     # Desenha todos os elementos visuais na tela a cada quadro
     def on_draw(self):
         # Limpa a tela
         self.clear()
 
-        # Desenha o cenário centralizado e esticado para o tamanho total da tela
+        # Desenha o cenário de fundo centralizado e preenchendo toda a tela
         arcade.draw_texture_rect(
             texture=self.fundo,
             rect=arcade.XYWH(
@@ -201,73 +220,78 @@ class TelaJogo(arcade.View):
             )
         )
 
-        # Desenhar as listas de sprites na tela
-        self.sprite_jogador.draw()
-        self.sprite_moedas.draw()
+        # Desenha na tela todas as listas de sprites
+        self.sprite_blocos.draw()   # Desenha os blocos do chão e plataformas
+        self.sprite_moedas.draw()   # Desenha todas as moedas
+        self.sprite_jogador.draw()  # Desenha o jogador
 
         # Desenha os textos informativos (HUD): pontuação e tempo decorrido
         arcade.draw_text(f"Moedas Coletadas: {self.pontuacao}", 10, 570, arcade.color.WHITE, 14, bold=True)
         arcade.draw_text(f"Tempo: {self.tempo_decorrido:.1f}s", 10, 545, arcade.color.WHITE, 14)
-    
-    # Atualiza a lógica do jogo e das coisas que estão na tela
+
+    # Atualiza a lógica do jogo (física, posições, colisões e condições de vitória)
     def on_update(self, delta_time):
         # Incrementa o tempo decorrido da partida
         self.tempo_decorrido += delta_time
 
-        # Atualizar as listas de sprites, chamando o método update de cada sprite
-        self.sprite_jogador.update(delta_time)
+        # Atualiza o motor de física (movimentação com gravidade e colisão com blocos)
+        self.engine_fisica.update()
+
+        # Atualiza o sprite do jogador (ajusta a textura conforme a direção e checa limites)
+        self.personagem.update()
+
+        # Atualiza a movimentação das moedas móveis
         self.sprite_moedas.update(delta_time)
 
-        # Verifica se houve colisão entre o jogador e a lista de moedas
+        # Verifica se houve colisão entre o jogador e qualquer uma das moedas na lista
         moedas_colididas = arcade.check_for_collision_with_list(self.personagem, self.sprite_moedas)
         
-        # Para cada moeda colidida
+        # Itera sobre cada moeda que colidiu com o jogador
         for moeda in moedas_colididas:
-            # Remove a moeda da lista para que suma da tela
+            # Remove a moeda da lista para que ela desapareça da tela
             moeda.remove_from_sprite_lists()
             
-            # Se a moeda está em movimento (change_x != 0 ou change_y != 0), soma 3 pontos; se parada, soma 1
+            # Se a moeda estava em movimento (change_x != 0 ou change_y != 0), concede 3 pontos; caso contrário, 1 ponto
             if moeda.change_x != 0 or moeda.change_y != 0:
                 self.pontuacao += 3
             else:
                 self.pontuacao += 1
 
-        # Verificar se todas as moedas foram coletadas (condição de vitória)
+        # Verifica se todas as moedas foram coletadas (condição de vitória)
         if len(self.sprite_moedas) == 0:
-            # Calcula o tempo total gasto na partida
+            # Calcula o tempo total real gasto na partida
             tempo_total = time.time() - self.tempo_inicio
             # Cria a tela de Game Over passando a pontuação final e o tempo total
             tela_game_over = TelaGameOver(pontuacao=self.pontuacao, tempo_jogo=tempo_total)
-            # Transiciona para a tela de Game Over
+            # Transiciona a janela para a visualização de Game Over
             self.window.show_view(tela_game_over)
 
-    # Eventos de teclas pressionadas
+    # Trata os eventos de teclas pressionadas pelo jogador
     def on_key_press(self, key, modifiers):
-        # Verifica a tecla pressionada e aplica a velocidade e textura na direção correspondente
+        # Movimentação para a direita: velocidade positiva e atualiza sprite para direita
         if key == arcade.key.RIGHT:
             self.personagem.change_x = self.velocidade
             self.personagem.texture = self.personagem.textura_direita
+        # Movimentação para a esquerda: velocidade negativa e atualiza sprite para esquerda
         elif key == arcade.key.LEFT:
             self.personagem.change_x = -self.velocidade
             self.personagem.texture = self.personagem.textura_esquerda
-        elif key == arcade.key.UP:
-            self.personagem.change_y = self.velocidade
-        elif key == arcade.key.DOWN:
-            self.personagem.change_y = -self.velocidade
 
-        # Se apertou ESC, volta para a tela inicial
+        # Mecânica de pulo: verifica se o jogador está sobre uma superfície sólida
+        if key == arcade.key.UP or key == arcade.key.SPACE:
+            if self.engine_fisica.can_jump():
+                self.personagem.change_y = 16  # Aplica o impulso vertical para o pulo
+
+        # Se pressionar ESC durante a partida, retorna ao menu inicial
         if key == arcade.key.ESCAPE:
             tela_inicial = TelaInicial()
             self.window.show_view(tela_inicial)
 
-    # Evento ao soltar as teclas
+    # Trata os eventos ao soltar as teclas
     def on_key_release(self, key, modifiers):
-        # Ao soltar as teclas de movimento horizontal, zera o change_x
+        # Ao soltar a tecla de seta para a direita ou para a esquerda, para o movimento horizontal
         if key == arcade.key.RIGHT or key == arcade.key.LEFT:
             self.personagem.change_x = 0
-        # Ao soltar as teclas de movimento vertical, zera o change_y
-        elif key == arcade.key.UP or key == arcade.key.DOWN:
-            self.personagem.change_y = 0
 
 
 # ==========================================
@@ -286,7 +310,7 @@ class TelaGameOver(arcade.View):
         self.tempo_jogo = tempo_jogo
 
     def on_show_view(self):
-        # Define a cor de fundo para a tela final
+        # Define a cor de fundo para destacar as informações finais
         arcade.set_background_color(arcade.color.AMAZON)
 
     def on_draw(self):
@@ -365,13 +389,13 @@ class TelaGameOver(arcade.View):
 # FUNÇÃO PRINCIPAL DE EXECUÇÃO
 # ==========================================
 def executar():
-    # Cria a janela principal do jogo com os parâmetros
+    # Cria a janela principal do jogo com as dimensões e título definidos
     jogo = arcade.Window(LARGURA, ALTURA, TITULO)
-    # Cria uma tela inicial
+    # Cria a instância da tela inicial (menu)
     tela_inicial = TelaInicial()
-    # Coloca essa tela inicial na janela do jogo
+    # Define a tela inicial como a view ativa na janela
     jogo.show_view(tela_inicial)
-    # Executa o arcade
+    # Inicia o loop principal de eventos do Arcade
     arcade.run()
 
 
