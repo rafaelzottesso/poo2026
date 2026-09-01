@@ -68,7 +68,6 @@ class Player(arcade.Sprite):
     def __init__(self):
         # 1. Carrega as folhas de sprites (spritesheets) para a direita e esquerda
         sheet_direita = arcade.load_spritesheet("player_direita.png")
-        sheet_esquerda = arcade.load_spritesheet("player_esquerda.png")
 
         # 2. Extrai a grade de texturas (cada quadro individual tem 252x247 px: 1008 / 4 = 252)
         quadros_direita = sheet_direita.get_texture_grid(
@@ -76,15 +75,13 @@ class Player(arcade.Sprite):
             columns=4,
             count=4
         )
-        quadros_esquerda = sheet_esquerda.get_texture_grid(
-            size=(252, 247),  # Tamanho de CADA quadro (largura_individual, altura_individual)
-            columns=4,
-            count=4
-        )
-        # Como a imagem player_esquerda.png foi espelhada horizontalmente inteira,
-        # a ordem dos quadros veio invertida: [Pulo, Passo 2, Passo 1, Parado].
-        # Invertemos a lista para alinhar com a da direita: [Parado, Passo 1, Passo 2, Pulo].
-        quadros_esquerda.reverse()
+        
+        # Criar quadros_esquerda para armazenar a imagem do player indo para esquerda
+        quadros_esquerda = []
+        # Para cada frame da imagem do player indo para direita
+        for frame in quadros_direita:
+            # Inverte horizontalmente e armazena em quadros_esquerda
+            quadros_esquerda.append(frame.flip_left_right())
 
         # 3. Inicializa o Sprite com a primeira textura da lista (quadro 0)
         super().__init__(quadros_direita[0], scale=0.5)
